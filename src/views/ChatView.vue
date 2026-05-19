@@ -70,7 +70,7 @@ const router = useRouter()
 
 const input = ref('')
 const messages = ref([])
-const username = ref(localStorage.getItem('username') || 'Cloud')
+const username = ref(localStorage.getItem('username'))
 
 let conn = null
 
@@ -83,14 +83,21 @@ const contacts = ref([
 
 const activeContact = ref(contacts.value[0])
 
-onMounted(() => {
-  const token = localStorage.getItem('token')
-
-  if (!token) {
+onMounted(async () => {
+  const res=await fetch("http://localhost:9090/api/me", {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      }
+  )
+  if(!res.ok){
     router.push('/login')
     return
   }
-
+  const data = await res.json()
+  username.value=data.username
   conn = new WebSocket('ws://localhost:9090/ws')
 
   conn.onopen = () => {
@@ -99,6 +106,7 @@ onMounted(() => {
 
   conn.onmessage = (event) => {
     messages.value.push(event.data)
+    contacts.value[0].desc=event.data
   }
 
   conn.onclose = () => {
@@ -128,9 +136,8 @@ function sendMessage() {
 }
 
 function logout() {
-  localStorage.removeItem('token')
   localStorage.removeItem('username')
-
+  sessionStorage.clear()
   if (conn) {
     conn.close()
   }

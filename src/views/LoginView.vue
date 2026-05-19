@@ -50,10 +50,6 @@ async function login() {
     alert('登录失败')
     return
   }
-
-  const data = await res.json()
-
-  localStorage.setItem('token', data.token || '')
   localStorage.setItem('username', username.value)
 
   router.push('/chat')
