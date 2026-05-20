@@ -38,13 +38,30 @@
 
       <section class="log">
         <div
-            v-for="(item, index) in messages"
+            v-for="(item, index) in activeContact.messages"
             :key="index"
             class="message-row"
+            :class="{ self: item.senderId === userid }"
         >
-          <div class="message-bubble">
-            {{ item }}
+
+          <div class="profile-avatar">
+            {{ item.senderName.slice(0, 1) }}
           </div>
+
+          <div class="message-content">
+
+            <div class="message-name">
+              {{ item.senderName }}
+            </div>
+
+            <div class="message-bubble">
+              <div class="message-text">
+                {{ item.text }}
+              </div>
+            </div>
+
+          </div>
+
         </div>
       </section>
 
@@ -69,20 +86,18 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const input = ref('')
-const messages = ref([])
-const username = ref(localStorage.getItem('username'))
-
+const username = ref(localStorage.getItem('username')||'')
+const userid = ref(localStorage.getItem('userid')||'')
 let conn = null
 
 const contacts = ref([
-  { id: 1, name: '聊天室大厅', desc: '公共频道', avatar: '群' },
-  { id: 2, name: 'Alice', desc: '前端开发', avatar: 'A' },
-  { id: 3, name: 'Bob', desc: 'Go 后端', avatar: 'B' },
-  { id: 4, name: 'System', desc: '系统通知', avatar: 'S' },
+  { id: 1, name: '聊天室大厅', desc: '公共频道', avatar: '群',messages:[] },
+  { id: 2, name: 'DDDG', desc: '前端开发', avatar: 'A',messages:[] },
+  { id: 3, name: 'Bob', desc: 'Go 后端', avatar: 'B',messages:[]},
+  { id: 4, name: 'System', desc: '系统通知', avatar: 'S' ,messages:[]},
 ])
 
 const activeContact = ref(contacts.value[0])
-
 onMounted(async () => {
   const res=await fetch("http://localhost:9090/api/me", {
         method: 'GET',
@@ -96,25 +111,29 @@ onMounted(async () => {
     router.push('/login')
     return
   }
-  const data = await res.json()
+  const data=await res.json()
+  userid.value=data.id
   username.value=data.username
   conn = new WebSocket('ws://localhost:9090/ws')
 
-  conn.onopen = () => {
-    messages.value.push('WebSocket connected.')
-  }
 
   conn.onmessage = (event) => {
-    messages.value.push(event.data)
-    contacts.value[0].desc=event.data
+    const data = JSON.parse(event.data)
+    activeContact.value.messages.push(
+        {
+          senderId: data.senderId,
+          text: data.text,
+          senderName: data.senderName,
+        }
+    )
+    activeContact.value.desc=data.text
   }
-
   conn.onclose = () => {
-    messages.value.push('Connection closed.')
+    alert('Connection closed.')
   }
 
   conn.onerror = (err) => {
-    console.error('WebSocket error:', err)
+    alert('WebSocket error:', err)
   }
 })
 
@@ -128,20 +147,29 @@ function sendMessage() {
   if (!conn) return
   if (conn.readyState !== WebSocket.OPEN) return
   if (!input.value.trim()) return
-
-  const text = `[${activeContact.value.name}] ${username.value}: ${input.value}`
-
-  conn.send(text)
+  const text = `${input.value}`
+  const msg={
+    text:text,
+    senderId:userid.value,
+    senderName:username.value,
+  }
+  conn.send(JSON.stringify(msg))
   input.value = ''
 }
 
 function logout() {
   localStorage.removeItem('username')
-  sessionStorage.clear()
   if (conn) {
     conn.close()
   }
-
+  fetch("http://localhost:9090/api/logout", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      }
+  )
   router.push('/login')
 }
 </script>
@@ -294,15 +322,30 @@ function logout() {
   display: flex;
   margin-bottom: 12px;
 }
-
-.message-bubble {
+.message-content {
+  display: flex;
+  flex-direction: column;
   max-width: 70%;
-  padding: 12px 14px;
+}
+.message-name {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #64748b;
+}
+.message-bubble {
+  width: fit-content;
+  max-width: 100%;
+
   background: white;
-  border-radius: 16px 16px 16px 4px;
+  border-radius: 16px;
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+
   white-space: pre-wrap;
+  overflow-wrap: break-word;
+
   line-height: 1.5;
+  padding: 12px 16px;
 }
 
 .form {
@@ -312,7 +355,21 @@ function logout() {
   background: white;
   border-top: 1px solid #e5e7eb;
 }
+.message-row.self {
+  justify-content: flex-end;
+}
+.message-row.self .message-content {
+  align-items: flex-end;
+}
+.message-row.self .profile-avatar {
+  order: 2;
 
+  margin-left: 0;
+  margin-right: 0;
+}
+.message-row.self .message-bubble {
+  background: #2563eb;
+}
 textarea {
   flex: 1;
   resize: none;
