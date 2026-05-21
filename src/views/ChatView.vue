@@ -4,11 +4,11 @@
       <div class="sidebar-title">Chats</div>
 
       <div
-          v-for="user in contacts"
-          :key="user.id"
+          v-for="(user,id) in contacts"
+          :key="id"
           class="contact"
           :class="{ active: user.id === activeContact.id }"
-          @click="activeContact = user"
+          @click="activeContact = user;roomId=id"
       >
         <div class="avatar">{{ user.avatar }}</div>
 
@@ -88,13 +88,14 @@ const router = useRouter()
 const input = ref('')
 const username = ref(localStorage.getItem('username')||'')
 const userid = ref(localStorage.getItem('userid')||'')
+let roomId=1
 let conn = null
 
-const contacts = ref([
-    { id: 1, name: '聊天室大厅', desc: '', avatar: '群',messages:[] }
-])
+const contacts = ref({
+  1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: []}
+})
 
-const activeContact = ref(contacts.value[0])
+const activeContact = ref(contacts.value[roomId])
 onMounted(async () => {
   const res=await fetch("http://localhost:9090/api/me", {
         method: 'GET',
@@ -125,7 +126,7 @@ onMounted(async () => {
   }
   const friendData = await friendRes.json()
   for (const item of friendData.friends){
-    contacts.value.push(
+    contacts.value[item.roomId] =
         {
           id : item.friendId,
           name : 'name',
@@ -133,21 +134,22 @@ onMounted(async () => {
           avatar : 'avatar',
           messages :[]
         }
-    )
   }
   conn = new WebSocket('ws://localhost:9090/ws')
 
 
   conn.onmessage = (event) => {
     const data = JSON.parse(event.data)
-    activeContact.value.messages.push(
+    console.log(data.roomId)
+    console.log(contacts.value)
+    contacts.value[data.roomId].messages.push(
         {
           senderId: data.senderId,
           text: data.text,
           senderName: data.senderName,
         }
     )
-    activeContact.value.desc=data.text
+    contacts.value[data.roomId].desc=data.text
   }
   conn.onclose = () => {
     alert('Connection closed.')
@@ -170,6 +172,7 @@ function sendMessage() {
   if (!input.value.trim()) return
   const text = `${input.value}`
   const msg={
+    roomId:roomId,
     text:text,
     senderId:userid.value,
     senderName:username.value,
