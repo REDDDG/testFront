@@ -91,10 +91,7 @@ const userid = ref(localStorage.getItem('userid')||'')
 let conn = null
 
 const contacts = ref([
-  { id: 1, name: '聊天室大厅', desc: '公共频道', avatar: '群',messages:[] },
-  { id: 2, name: 'DDDG', desc: '前端开发', avatar: 'A',messages:[] },
-  { id: 3, name: 'Bob', desc: 'Go 后端', avatar: 'B',messages:[]},
-  { id: 4, name: 'System', desc: '系统通知', avatar: 'S' ,messages:[]},
+    { id: 1, name: '聊天室大厅', desc: '', avatar: '群',messages:[] }
 ])
 
 const activeContact = ref(contacts.value[0])
@@ -114,6 +111,30 @@ onMounted(async () => {
   const data=await res.json()
   userid.value=data.id
   username.value=data.username
+
+  const friendRes =await fetch("http://localhost:9090/api/friends", {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      }
+  )
+  if(!friendRes.ok){
+    logout()
+  }
+  const friendData = await friendRes.json()
+  for (const item of friendData.friends){
+    contacts.value.push(
+        {
+          id : item.friendId,
+          name : 'name',
+          desc: 'N',
+          avatar : 'avatar',
+          messages :[]
+        }
+    )
+  }
   conn = new WebSocket('ws://localhost:9090/ws')
 
 
