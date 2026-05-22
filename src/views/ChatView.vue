@@ -129,9 +129,9 @@ onMounted(async () => {
     contacts.value[item.roomId] =
         {
           id : item.friendId,
-          name : 'name',
-          desc: 'N',
-          avatar : 'avatar',
+          name : item.friendName,
+          desc: '',
+          avatar : 'C',
           messages :[]
         }
   }
