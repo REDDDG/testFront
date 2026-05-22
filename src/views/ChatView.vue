@@ -113,7 +113,7 @@ onMounted(async () => {
   userid.value=data.id
   username.value=data.username
 
-  const friendRes =await fetch("http://localhost:9090/api/friends", {
+  const roomRes =await fetch("http://localhost:9090/api/rooms", {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -121,17 +121,27 @@ onMounted(async () => {
         credentials: 'include'
       }
   )
-  if(!friendRes.ok){
+  if(!roomRes.ok){
     logout()
   }
-  const friendData = await friendRes.json()
-  for (const item of friendData.friends){
+  const roomData = await roomRes.json()
+  if(roomData.friends)for (const item of roomData.friends){
     contacts.value[item.roomId] =
         {
           id : item.friendId,
           name : item.friendName,
           desc: '',
           avatar : 'C',
+          messages :[]
+        }
+  }
+  if(roomData.rooms)for (const item of roomData.rooms){
+    contacts.value[item.roomId] =
+        {
+          id : item.roomId,
+          name : item.roomName,
+          desc: '',
+          avatar : '群',
           messages :[]
         }
   }
