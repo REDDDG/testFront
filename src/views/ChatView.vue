@@ -7,7 +7,7 @@
           v-for="(user,id) in contacts"
           :key="id"
           class="contact"
-          :class="{ active: id === roomId }"
+          :class="{ active:Number(id) === roomId }"
           @click="activeContact = user;roomId=Number(id)"
       >
         <div class="avatar">{{ user.avatar }}</div>
