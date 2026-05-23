@@ -88,14 +88,14 @@ const router = useRouter()
 const input = ref('')
 const username = ref(localStorage.getItem('username')||'')
 const userid = ref(localStorage.getItem('userid')||'')
-let roomId=1
+const roomId = ref(1)
 let conn = null
 
 const contacts = ref({
   1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: []}
 })
 
-const activeContact = ref(contacts.value[roomId])
+const activeContact = ref(contacts.value[roomId.value])
 onMounted(async () => {
   const res=await fetch("http://localhost:9090/api/me", {
         method: 'GET',
@@ -182,7 +182,7 @@ function sendMessage() {
   if (!input.value.trim()) return
   const text = `${input.value}`
   const msg={
-    roomId:roomId,
+    roomId:roomId.value,
     text:text,
     senderId:userid.value,
     senderName:username.value,
