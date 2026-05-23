@@ -50,8 +50,6 @@ async function login() {
     alert('登录失败')
     return
   }
-  localStorage.setItem('username', username.value)
-
   router.push('/chat')
 }
 </script>

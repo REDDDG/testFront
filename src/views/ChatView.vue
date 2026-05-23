@@ -86,8 +86,8 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const input = ref('')
-const username = ref(localStorage.getItem('username')||'')
-const userid = ref(localStorage.getItem('userid')||'')
+const username = ref('')
+const userid = ref(0)
 const roomId = ref(1)
 let conn = null
 let shouldReconnect = true
@@ -205,7 +205,6 @@ function sendMessage() {
 function logout() {
   shouldReconnect = false
   if (reconnectTimer) clearTimeout(reconnectTimer)
-  localStorage.removeItem('username')
   if (conn) {
     conn.close()
   }
