@@ -82,6 +82,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { userStore } from '@/store/user'
 
 const router = useRouter()
 
@@ -99,21 +100,8 @@ const contacts = ref({
 
 const activeContact = ref(contacts.value[roomId.value])
 onMounted(async () => {
-  const res=await fetch("http://localhost:9090/api/me", {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      }
-  )
-  if(!res.ok){
-    router.push('/login')
-    return
-  }
-  const data=await res.json()
-  userid.value=data.id
-  username.value=data.username
+  userid.value = userStore.id
+  username.value = userStore.username
 
   const roomRes =await fetch("http://localhost:9090/api/rooms", {
         method: 'GET',
