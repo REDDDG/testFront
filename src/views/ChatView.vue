@@ -90,6 +90,8 @@ const username = ref(localStorage.getItem('username')||'')
 const userid = ref(localStorage.getItem('userid')||'')
 const roomId = ref(1)
 let conn = null
+let shouldReconnect = true
+let reconnectTimer = null
 
 const contacts = ref({
   1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: []}
@@ -145,13 +147,17 @@ onMounted(async () => {
           messages :[]
         }
   }
-  conn = new WebSocket('ws://localhost:9090/ws')
+  connectWebSocket()
+})
 
+function connectWebSocket() {
+  if (conn && conn.readyState === WebSocket.OPEN) return
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+
+  conn = new WebSocket('ws://localhost:9090/ws')
 
   conn.onmessage = (event) => {
     const data = JSON.parse(event.data)
-    console.log(data.roomId)
-    console.log(contacts.value)
     contacts.value[data.roomId].messages.push(
         {
           senderId: data.senderId,
@@ -159,18 +165,23 @@ onMounted(async () => {
           senderName: data.senderName,
         }
     )
-    contacts.value[data.roomId].desc=data.text
-  }
-  conn.onclose = () => {
-    alert('Connection closed.')
+    contacts.value[data.roomId].desc = data.text
   }
 
-  conn.onerror = (err) => {
-    alert('WebSocket error:', err)
+  conn.onclose = () => {
+    if (shouldReconnect) {
+      reconnectTimer = setTimeout(connectWebSocket, 3000)
+    }
   }
-})
+
+  conn.onerror = () => {
+    conn.close()
+  }
+}
 
 onUnmounted(() => {
+  shouldReconnect = false
+  if (reconnectTimer) clearTimeout(reconnectTimer)
   if (conn) {
     conn.close()
   }
@@ -192,6 +203,8 @@ function sendMessage() {
 }
 
 function logout() {
+  shouldReconnect = false
+  if (reconnectTimer) clearTimeout(reconnectTimer)
   localStorage.removeItem('username')
   if (conn) {
     conn.close()
