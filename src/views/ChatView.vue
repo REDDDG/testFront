@@ -69,6 +69,7 @@
         <textarea
             v-model="input"
             rows="3"
+            maxlength="500"
             placeholder="输入消息，Ctrl + Enter 发送"
             @keydown.ctrl.enter.prevent="sendMessage"
         ></textarea>

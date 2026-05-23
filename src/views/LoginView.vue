@@ -5,8 +5,8 @@
       <p>欢迎回来，请登录你的账号</p>
 
       <form @submit.prevent="login">
-        <input v-model="username" placeholder="用户名" />
-        <input v-model="password" type="password" placeholder="密码" />
+        <input v-model="username" maxlength="12" placeholder="用户名" />
+        <input v-model="password" type="password" maxlength="20" placeholder="密码" />
 
         <button type="submit">登录</button>
       </form>

@@ -5,9 +5,9 @@
       <p>创建账号，开始聊天</p>
 
       <form @submit.prevent="register">
-        <input v-model="username" placeholder="用户名" />
-        <input v-model="password" type="password" placeholder="密码" />
-        <input v-model="confirmPassword" type="password" placeholder="确认密码" />
+        <input v-model="username" maxlength="12" placeholder="用户名" />
+        <input v-model="password" type="password" maxlength="20" placeholder="密码" />
+        <input v-model="confirmPassword" type="password" maxlength="20" placeholder="确认密码" />
 
         <button type="submit">注册</button>
       </form>
