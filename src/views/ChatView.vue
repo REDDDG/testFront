@@ -8,12 +8,15 @@
           :key="id"
           class="contact"
           :class="{ active:Number(id) === roomId }"
-          @click="activeContact = user;roomId=Number(id)"
+          @click="selectContact(user, id)"
       >
         <div class="avatar">{{ user.avatar }}</div>
 
         <div class="contact-info">
-          <div class="contact-name">{{ user.name }}</div>
+          <div class="contact-name">
+            {{ user.name }}
+            <span v-if="user.avatar !== '群'" class="online-dot" :class="{ online: onlineStatus[user.id] }"></span>
+          </div>
           <div class="contact-desc">{{ user.desc }}</div>
         </div>
       </div>
@@ -23,7 +26,9 @@
       <header class="chat-header">
         <div>
           <div class="chat-title">{{ activeContact.name }}</div>
-          <div class="chat-status">Online</div>
+          <div class="chat-status">
+            {{ activeContact.avatar !== '群' ? (onlineStatus[activeContact.id] ? 'Online' : 'Offline') : 'Online' }}
+          </div>
         </div>
 
         <div class="profile">
@@ -99,6 +104,9 @@ const contacts = ref({
   1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: []}
 })
 
+const onlineStatus = ref({})
+let onlineTimer = null
+
 const activeContact = ref(contacts.value[roomId.value])
 onMounted(async () => {
   userid.value = userStore.id
@@ -136,7 +144,11 @@ onMounted(async () => {
           messages :[]
         }
   }
+  await loadMessages(roomId.value)
   connectWebSocket()
+
+  await fetchOnlineStatus()
+  onlineTimer = setInterval(fetchOnlineStatus, 30000)
 })
 
 function connectWebSocket() {
@@ -147,14 +159,16 @@ function connectWebSocket() {
 
   conn.onmessage = (event) => {
     const data = JSON.parse(event.data)
-    contacts.value[data.roomId].messages.push(
+    const room = contacts.value[data.roomId]
+    if (!room) return
+    room.messages.push(
         {
           senderId: data.senderId,
           text: data.text,
           senderName: data.senderName,
         }
     )
-    contacts.value[data.roomId].desc = data.text
+    room.desc = data.text
   }
 
   conn.onclose = () => {
@@ -171,10 +185,54 @@ function connectWebSocket() {
 onUnmounted(() => {
   shouldReconnect = false
   if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (onlineTimer) clearInterval(onlineTimer)
   if (conn) {
     conn.close()
   }
 })
+
+function selectContact(user, id) {
+  activeContact.value = user
+  roomId.value = Number(id)
+  if (contacts.value[Number(id)].messages.length === 0) {
+    loadMessages(Number(id))
+  }
+}
+
+async function loadMessages(roomId) {
+  try {
+    const res = await fetch(`http://localhost:9090/api/messages?roomId=${roomId}&limit=50`, {
+      credentials: 'include'
+    })
+    if (!res.ok) {
+      console.warn('loadMessages: HTTP', res.status, 'for roomId', roomId)
+      return
+    }
+    const data = await res.json()
+    if (!contacts.value[roomId]) {
+      contacts.value[roomId] = { id: roomId, name: '', desc: '', avatar: '', messages: [] }
+    }
+    data.messages.reverse()
+    contacts.value[roomId].messages = data.messages
+    // Bug 1 fix: 同步 activeContact 到最新的 contacts 对象引用
+    activeContact.value = contacts.value[roomId]
+  } catch (e) {
+    console.error('loadMessages failed:', e)
+  }
+}
+
+async function fetchOnlineStatus() {
+  try {
+    const res = await fetch('http://localhost:9090/api/online-status', {
+      credentials: 'include'
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    onlineStatus.value = data.online || {}
+  } catch (e) {
+    console.error('fetchOnlineStatus failed:', e)
+  }
+}
 
 function sendMessage() {
   if (!conn) return
@@ -285,6 +343,19 @@ function logout() {
 .contact-name {
   font-size: 15px;
   font-weight: 600;
+}
+
+.online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b7280;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.online-dot.online {
+  background: #22c55e;
 }
 
 .contact-desc {
