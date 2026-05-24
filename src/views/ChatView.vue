@@ -188,6 +188,11 @@ function sendMessage() {
     senderName:username.value,
   }
   conn.send(JSON.stringify(msg))
+  // 乐观渲染：服务端不再回显，直接本地追加
+  if (contacts.value[roomId.value]) {
+    contacts.value[roomId.value].messages.push({...msg})
+    contacts.value[roomId.value].desc = text
+  }
   input.value = ''
 }
 
