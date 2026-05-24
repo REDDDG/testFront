@@ -223,8 +223,14 @@ async function loadMessages(roomId) {
 
 async function fetchOnlineStatus() {
   try {
+    const ids = Object.values(contacts.value)
+      .filter(c => c.avatar !== '群')
+      .map(c => c.id)
     const res = await fetch('http://localhost:9090/api/online-status', {
-      credentials: 'include'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ids })
     })
     if (!res.ok) return
     const data = await res.json()
