@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import ChatView from '../views/ChatView.vue'
+import ProfileView from '../views/ProfileView.vue'
 import { userStore } from '@/store/user'
 
 const routes = [
@@ -24,6 +25,11 @@ const routes = [
     {
         path: '/chat',
         component: ChatView,
+    },
+
+    {
+        path: '/profile',
+        component: ProfileView,
     },
 ]
 
@@ -47,6 +53,7 @@ router.beforeEach(async (to, from, next) => {
             const data = await res.json()
             userStore.id = data.id
             userStore.username = data.username
+            userStore.avatar = data.avatar || ''
             next()
         } else {
             next('/login')

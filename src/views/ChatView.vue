@@ -32,11 +32,14 @@
         </div>
 
         <div class="profile">
-          <div class="profile-text">
-            <div class="profile-name">{{ username }}</div>
-            <div class="profile-role">Go / Vue Learner</div>
+          <div class="profile-info" @click="goProfile">
+            <div class="profile-text">
+              <div class="profile-name">{{ username }}</div>
+              <div class="profile-role">Go / Vue Learner</div>
+            </div>
+            <img v-if="avatarUrl" :src="avatarUrl" class="profile-avatar" />
+            <div v-else class="profile-avatar">{{ username.slice(0, 1) }}</div>
           </div>
-          <div class="profile-avatar">{{ username.slice(0, 1) }}</div>
           <button class="logout-btn" @click="logout">退出</button>
         </div>
       </header>
@@ -49,7 +52,8 @@
             :class="{ self: item.senderId === userid }"
         >
 
-          <div class="profile-avatar">
+          <img v-if="item.senderId === userid && avatarUrl" :src="avatarUrl" class="profile-avatar" />
+          <div v-else class="profile-avatar">
             {{ item.senderName.slice(0, 1) }}
           </div>
 
@@ -86,11 +90,12 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userStore } from '@/store/user'
 
 const router = useRouter()
+const avatarUrl = computed(() => userStore.avatar ? 'http://localhost:9090' + userStore.avatar : '')
 
 const input = ref('')
 const username = ref('')
@@ -260,6 +265,10 @@ function sendMessage() {
   input.value = ''
 }
 
+function goProfile() {
+  router.push('/profile')
+}
+
 function logout() {
   shouldReconnect = false
   if (reconnectTimer) clearTimeout(reconnectTimer)
@@ -340,6 +349,7 @@ function logout() {
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  object-fit: cover;
 }
 
 .contact-info {
@@ -403,6 +413,20 @@ function logout() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.profile-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 4px 8px;
+  transition: 0.2s;
+}
+
+.profile-info:hover {
+  background: #f3f4f6;
 }
 
 .profile-text {
