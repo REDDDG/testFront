@@ -10,7 +10,8 @@
           :class="{ active:Number(id) === roomId }"
           @click="selectContact(user, id)"
       >
-        <div class="avatar">{{ user.avatar }}</div>
+        <img v-if="getAvatarUrl(user.id)&&user.avatar!=='群'" :src="getAvatarUrl(user.id)" class="avatar" />
+        <div v-else class="avatar">{{ user.avatar }}</div>
 
         <div class="contact-info">
           <div class="contact-name">
@@ -44,7 +45,7 @@
         </div>
       </header>
 
-      <section class="log">
+      <section class="log" ref="logContainer" @scroll="onLogScroll">
         <div
             v-for="(item, index) in activeContact.messages"
             :key="index"
@@ -52,7 +53,7 @@
             :class="{ self: item.senderId === userid }"
         >
 
-          <img v-if="item.senderId === userid && avatarUrl" :src="avatarUrl" class="profile-avatar" />
+          <img v-if="getAvatarUrl(item.senderId)" :src="getAvatarUrl(item.senderId)" class="profile-avatar" />
           <div v-else class="profile-avatar">
             {{ item.senderName.slice(0, 1) }}
           </div>
@@ -72,6 +73,10 @@
           </div>
 
         </div>
+
+        <div v-if="activeContact.unreadCount > 0" class="unread-banner">
+          未读消息：{{ activeContact.unreadCount }}条
+        </div>
       </section>
 
       <form class="form" @submit.prevent="sendMessage">
@@ -90,23 +95,64 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { userStore } from '@/store/user'
 
 const router = useRouter()
 const avatarUrl = computed(() => userStore.avatar ? 'http://localhost:9090' + userStore.avatar : '')
 
+// 头像缓存：{ [userId]: avatarPath }，持久化到 localStorage
+const avatarCache = ref(loadAvatarCache())
+
+function loadAvatarCache() {
+  try {
+    const raw = localStorage.getItem('chat_avatars')
+    return raw ? JSON.parse(raw) : {}
+  } catch { return {} }
+}
+
+function saveAvatarCache() {
+  localStorage.setItem('chat_avatars', JSON.stringify(avatarCache.value))
+}
+
+function getAvatarUrl(senderId) {
+  const path = avatarCache.value[senderId]
+  return path ? 'http://localhost:9090' + path : ''
+}
+
+async function fetchAvatar(userId) {
+  if (avatarCache.value[userId] !== undefined) return
+  try {
+    const res = await fetch(`http://localhost:9090/api/avatar?id=${userId}`)
+    if (!res.ok) return
+    const data = await res.json()
+    avatarCache.value[userId] = data.avatar || ''
+    saveAvatarCache()
+  } catch { /* ignore */ }
+}
+
+function prefetchAvatars(messages) {
+  const seen = new Set()
+  for (const m of messages) {
+    if (!seen.has(m.senderId)) {
+      seen.add(m.senderId)
+      fetchAvatar(m.senderId)
+    }
+  }
+}
+
 const input = ref('')
 const username = ref('')
 const userid = ref(0)
 const roomId = ref(1)
+const logContainer = ref(null)
 let conn = null
 let shouldReconnect = true
 let reconnectTimer = null
 
 const contacts = ref({
-  1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: []}
+  1: {id: 1, name: '聊天室大厅', desc: '', avatar: '群', messages: [], unreadCount: 0}
 })
 
 const onlineStatus = ref({})
@@ -116,6 +162,10 @@ const activeContact = ref(contacts.value[roomId.value])
 onMounted(async () => {
   userid.value = userStore.id
   username.value = userStore.username
+  if (userStore.avatar) {
+    avatarCache.value[userStore.id] = userStore.avatar
+    saveAvatarCache()
+  }
 
   const roomRes =await fetch("http://localhost:9090/api/rooms", {
         method: 'GET',
@@ -136,7 +186,8 @@ onMounted(async () => {
           name : item.friendName,
           desc: '',
           avatar : 'C',
-          messages :[]
+          messages :[],
+          unreadCount: 0
         }
   }
   if(roomData.rooms)for (const item of roomData.rooms){
@@ -146,7 +197,8 @@ onMounted(async () => {
           name : item.roomName,
           desc: '',
           avatar : '群',
-          messages :[]
+          messages :[],
+          unreadCount: 0
         }
   }
   await loadMessages(roomId.value)
@@ -166,14 +218,14 @@ function connectWebSocket() {
     const data = JSON.parse(event.data)
     const room = contacts.value[data.roomId]
     if (!room) return
-    room.messages.push(
-        {
-          senderId: data.senderId,
-          text: data.text,
-          senderName: data.senderName,
-        }
-    )
+    room.messages.push({
+      id: data.id,
+      senderId: data.senderId,
+      text: data.text,
+      senderName: data.senderName,
+    })
     room.desc = data.text
+    fetchAvatar(data.senderId)
   }
 
   conn.onclose = () => {
@@ -199,30 +251,83 @@ onUnmounted(() => {
 function selectContact(user, id) {
   activeContact.value = user
   roomId.value = Number(id)
-  if (contacts.value[Number(id)].messages.length === 0) {
-    loadMessages(Number(id))
-  }
+  loadMessages(Number(id))
 }
 
 async function loadMessages(roomId) {
   try {
-    const res = await fetch(`http://localhost:9090/api/messages?roomId=${roomId}&limit=50`, {
+    // 先尝试增量加载未读消息
+    const unreadRes = await fetch(`http://localhost:9090/api/messages?roomId=${roomId}&type=unread&limit=50`, {
       credentials: 'include'
     })
-    if (!res.ok) {
-      console.warn('loadMessages: HTTP', res.status, 'for roomId', roomId)
+    if (!unreadRes.ok) {
+      console.warn('loadMessages unread: HTTP', unreadRes.status, 'for roomId', roomId)
       return
     }
-    const data = await res.json()
+    const unreadData = await unreadRes.json()
     if (!contacts.value[roomId]) {
-      contacts.value[roomId] = { id: roomId, name: '', desc: '', avatar: '', messages: [] }
+      contacts.value[roomId] = { id: roomId, name: '', desc: '', avatar: '', messages: [], unreadCount: 0 }
     }
-    data.messages.reverse()
-    contacts.value[roomId].messages = data.messages
-    // Bug 1 fix: 同步 activeContact 到最新的 contacts 对象引用
+
+    if (unreadData.messages.length > 0) {
+      // 有未读消息，ASC 顺序（旧→新），直接显示
+      contacts.value[roomId].messages = unreadData.messages
+      contacts.value[roomId].unreadCount = unreadData.unreadCount
+    } else {
+      // 无未读消息，加载默认最近 50 条历史
+      const res = await fetch(`http://localhost:9090/api/messages?roomId=${roomId}&limit=50`, {
+        credentials: 'include'
+      })
+      if (res.ok) {
+        const data = await res.json()
+        data.messages.reverse()
+        contacts.value[roomId].messages = data.messages
+        contacts.value[roomId].unreadCount = 0
+      }
+    }
+    prefetchAvatars(contacts.value[roomId].messages)
     activeContact.value = contacts.value[roomId]
+    nextTick(() => {
+      if (logContainer.value) {
+        logContainer.value.scrollTop = logContainer.value.scrollHeight
+      }
+    })
   } catch (e) {
     console.error('loadMessages failed:', e)
+  }
+}
+
+async function loadMoreUnread(roomId) {
+  const room = contacts.value[roomId]
+  if (!room || room.unreadCount <= 0 || room._loadingMore) return
+
+  const messages = room.messages
+  if (messages.length === 0) return
+  const lastMsg = messages[messages.length - 1]
+
+  room._loadingMore = true
+  try {
+    const res = await fetch(`http://localhost:9090/api/messages?roomId=${roomId}&type=unread&limit=50&afterId=${lastMsg.id}`, {
+      credentials: 'include'
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    if (data.messages.length > 0) {
+      room.messages.push(...data.messages)
+      room.unreadCount = data.unreadCount
+      prefetchAvatars(data.messages)
+    }
+  } catch (e) {
+    console.error('loadMoreUnread failed:', e)
+  } finally {
+    room._loadingMore = false
+  }
+}
+
+function onLogScroll(event) {
+  const el = event.target
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+    loadMoreUnread(roomId.value)
   }
 }
 
@@ -537,5 +642,16 @@ textarea:focus {
 
 .send-btn:hover {
   background: #1d4ed8;
+}
+
+.unread-banner {
+  text-align: center;
+  padding: 10px 0;
+  margin: 12px 0;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.08);
+  border-radius: 8px;
 }
 </style>
