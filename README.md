@@ -1,5 +1,4 @@
 # vue
-# 纯AI
 ## Project setup
 ```
 npm install
