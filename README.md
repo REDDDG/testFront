@@ -1,23 +1,4 @@
-# vue
-## Project setup
-```
-npm install
-```
-
-### Compiles and hot-reloads for development
-```
-npm run serve
-```
-
-### Compiles and minifies for production
-```
-npm run build
-```
-
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+# 前端页面
+- 启动后访问8082显示页面
+- 若无cookie（登陆状态），自动跳转注册页面
+- 聊天页面点击右上角可进入修改个人信息的页面
